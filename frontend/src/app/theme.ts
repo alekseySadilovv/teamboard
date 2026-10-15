@@ -15,5 +15,6 @@ export const theme = createTheme({
   components: {
     MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { textTransform: 'none' } } },
     MuiCard: { defaultProps: { variant: 'outlined' } },
+    MuiOutlinedInput: { styleOverrides: { notchedOutline: { '& legend': { transition: 'none' } } } },
   },
 })
