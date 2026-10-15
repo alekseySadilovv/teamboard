@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { setUnauthorizedListener, syncDemoUser } from '../../../shared/api'
+import { setUnauthorizedListener } from '../../../shared/api'
 import { userApi, type User } from '../../user'
 import { sessionApi } from '../api/sessionApi'
 import { SessionContext } from './context'
@@ -13,7 +13,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const statusRef = useRef<SessionStatus>('loading')
 
   const applyUser = useCallback((value: User | null) => {
-    syncDemoUser(value)
     setUserState(value)
     statusRef.current = value ? 'authenticated' : 'anonymous'
     setStatus(statusRef.current)

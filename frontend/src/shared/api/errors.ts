@@ -17,7 +17,9 @@ export class ApiError extends Error {
 
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 0) return 'Сервер недоступен. Проверьте подключение и попробуйте ещё раз'
+    if (error.status === 0 || error.status >= 500) {
+      return 'Сервер недоступен или временно не отвечает. Попробуйте ещё раз'
+    }
     if (error.status === 403) return error.message || 'Недостаточно прав для этого действия'
     return error.message
   }
