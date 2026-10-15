@@ -1,4 +1,7 @@
 export { api } from './client'
 export { ApiError, getErrorMessage } from './errors'
 export type { FieldError } from './errors'
+export { refreshAccessToken, setUnauthorizedListener } from './http'
+export { syncDemoUser } from './mock/server'
+export { tokenStore } from './tokenStore'
 export type { Page, QueryParams } from './types'

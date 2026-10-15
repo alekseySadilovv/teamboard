@@ -8,6 +8,7 @@ export interface User extends UserShort {
   email: string
   bio: string
   skills: string[]
+  isAdmin: boolean
   createdAt: string
 }
 

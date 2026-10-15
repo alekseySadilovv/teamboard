@@ -3,30 +3,29 @@ import type { RequestOptions } from '../types'
 import { db, nextId, type MockApplicationStatus, type MockProjectStatus, type ProjectRow, type UserRow } from './data'
 
 const LATENCY_MS = 450
-const SESSION_KEY = 'teamboard.mock.session'
 const OWNER_ROLE_TITLE = 'Автор проекта'
 
 type Body = Record<string, unknown>
 type Handler = (match: RegExpMatchArray, options: RequestOptions) => unknown
 
-function readSession(): number | null {
-  try {
-    const value = sessionStorage.getItem(SESSION_KEY)
-    return value === null ? 1 : value === '' ? null : Number(value)
-  } catch {
-    return 1
-  }
+let currentUserId: number | null = null
+
+interface DemoUser {
+  id: number
+  username: string
+  email: string
+  fullName: string
+  bio: string
+  skills: string[]
+  createdAt: string
 }
 
-let currentUserId: number | null = readSession()
-
-function setSession(userId: number | null) {
-  currentUserId = userId
-  try {
-    sessionStorage.setItem(SESSION_KEY, userId === null ? '' : String(userId))
-  } catch {
-    // sessionStorage недоступен — сессия живёт до перезагрузки
-  }
+export function syncDemoUser(user: DemoUser | null) {
+  currentUserId = user?.id ?? null
+  if (!user) return
+  const existing = db.users.find((item) => item.id === user.id)
+  if (existing) Object.assign(existing, user)
+  else db.users.push({ ...user })
 }
 
 const now = () => new Date().toISOString()
@@ -51,8 +50,6 @@ const userShort = (id: number) => {
   const user = db.users.find((item) => item.id === id)!
   return { id: user.id, username: user.username, fullName: user.fullName }
 }
-
-const userDto = ({ password: _password, ...user }: UserRow) => user
 
 function projectDto(project: ProjectRow) {
   const roles = db.roles
@@ -120,43 +117,6 @@ function syncRoles(projectId: number, roles: Body[]) {
 }
 
 const routes: [string, RegExp, Handler][] = [
-  ['POST', /^\/auth\/login$/, (_, { body }) => {
-    const { email, password } = body as Body
-    const user = db.users.find((item) => item.email === String(email).toLowerCase())
-    if (!user || user.password !== password) throw new ApiError(401, 'Неверный email или пароль')
-    setSession(user.id)
-    return { user: userDto(user) }
-  }],
-  ['POST', /^\/auth\/register$/, (_, { body }) => {
-    const data = body as Body
-    const email = String(data.email).toLowerCase()
-    if (db.users.some((item) => item.email === email)) throw new ApiError(409, 'Пользователь с таким email уже существует')
-    if (db.users.some((item) => item.username.toLowerCase() === String(data.username).toLowerCase())) {
-      throw new ApiError(409, 'Пользователь с таким именем уже существует')
-    }
-    const user: UserRow = {
-      id: nextId(db.users),
-      username: String(data.username),
-      email,
-      fullName: String(data.fullName),
-      bio: '',
-      skills: [],
-      password: String(data.password),
-      createdAt: now(),
-    }
-    db.users.push(user)
-    setSession(user.id)
-    return { user: userDto(user) }
-  }],
-  ['POST', /^\/auth\/logout$/, () => {
-    setSession(null)
-  }],
-  ['GET', /^\/users\/me$/, () => userDto(requireUser())],
-  ['PATCH', /^\/users\/me$/, (_, { body }) => {
-    const user = requireUser()
-    Object.assign(user, body)
-    return userDto(user)
-  }],
   ['GET', /^\/tags$/, () => {
     const counts = new Map<string, number>()
     db.projects.forEach((project) => project.tags.forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1)))

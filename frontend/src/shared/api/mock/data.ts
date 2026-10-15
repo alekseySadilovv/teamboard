@@ -8,7 +8,6 @@ export interface UserRow {
   fullName: string
   bio: string
   skills: string[]
-  password: string
   createdAt: string
 }
 
@@ -56,11 +55,11 @@ const date = (value: string) => new Date(value).toISOString()
 
 export const db = {
   users: [
-    { id: 1, username: 'asadilov', email: 'asadilov@example.com', fullName: 'Алексей Садилов', bio: 'Студент МТУСИ, frontend-разработчик.', skills: ['React', 'TypeScript', 'Python'], password: 'password1', createdAt: date('2026-09-01') },
-    { id: 2, username: 'mpetrova', email: 'mpetrova@example.com', fullName: 'Мария Петрова', bio: 'Backend-разработчик, люблю базы данных.', skills: ['Python', 'FastAPI', 'PostgreSQL'], password: 'password1', createdAt: date('2026-09-01') },
-    { id: 3, username: 'ismirnov', email: 'ismirnov@example.com', fullName: 'Иван Смирнов', bio: 'Занимаюсь машинным обучением.', skills: ['PyTorch', 'OpenCV'], password: 'password1', createdAt: date('2026-09-02') },
-    { id: 4, username: 'okuznetsova', email: 'okuznetsova@example.com', fullName: 'Ольга Кузнецова', bio: 'Дизайнер интерфейсов и иллюстратор.', skills: ['Figma', 'Pixel art'], password: 'password1', createdAt: date('2026-09-03') },
-    { id: 5, username: 'dorlov', email: 'dorlov@example.com', fullName: 'Дмитрий Орлов', bio: 'Fullstack, делаю учебные платформы.', skills: ['React', 'Node.js', 'SQL'], password: 'password1', createdAt: date('2026-09-04') },
+    { id: 1, username: 'asadilov', email: 'asadilov@example.com', fullName: 'Алексей Садилов', bio: 'Студент МТУСИ, frontend-разработчик.', skills: ['React', 'TypeScript', 'Python'], createdAt: date('2026-09-01') },
+    { id: 2, username: 'mpetrova', email: 'mpetrova@example.com', fullName: 'Мария Петрова', bio: 'Backend-разработчик, люблю базы данных.', skills: ['Python', 'FastAPI', 'PostgreSQL'], createdAt: date('2026-09-01') },
+    { id: 3, username: 'ismirnov', email: 'ismirnov@example.com', fullName: 'Иван Смирнов', bio: 'Занимаюсь машинным обучением.', skills: ['PyTorch', 'OpenCV'], createdAt: date('2026-09-02') },
+    { id: 4, username: 'okuznetsova', email: 'okuznetsova@example.com', fullName: 'Ольга Кузнецова', bio: 'Дизайнер интерфейсов и иллюстратор.', skills: ['Figma', 'Pixel art'], createdAt: date('2026-09-03') },
+    { id: 5, username: 'dorlov', email: 'dorlov@example.com', fullName: 'Дмитрий Орлов', bio: 'Fullstack, делаю учебные платформы.', skills: ['React', 'Node.js', 'SQL'], createdAt: date('2026-09-04') },
   ] as UserRow[],
   projects: [
     { id: 1, title: 'Расписание МТУСИ', summary: 'Мобильное приложение с расписанием занятий и уведомлениями о переносах.', description: 'Поиск по группе и преподавателю, push-уведомления об изменениях, офлайн-режим. Backend на FastAPI уже частично готов.', status: 'recruiting', tags: ['fastapi', 'mobile', 'python'], ownerId: 1, createdAt: date('2026-09-02'), updatedAt: date('2026-09-02') },

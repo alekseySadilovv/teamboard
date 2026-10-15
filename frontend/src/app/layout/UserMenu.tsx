@@ -34,9 +34,9 @@ export function UserMenu() {
 
   const handleLogout = async () => {
     setAnchor(null)
+    navigate('/')
     await logout()
     notify('Вы вышли из аккаунта', 'info')
-    navigate('/')
   }
 
   return (
