@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Окружение и секреты
+.env
+*.local
+
+# IDE и ОС
+.idea/
+.vscode/
+.DS_Store
