@@ -1,9 +1,15 @@
+import type { ReactNode } from 'react'
 import { Card, CardContent, List, ListItem, ListItemAvatar, ListItemText, Typography } from '@mui/material'
 import type { Member } from '../../../entities/project'
 import { UserAvatar } from '../../../entities/user'
 import { pluralize } from '../../../shared/lib/format'
 
-export function TeamCard({ members }: { members: Member[] }) {
+interface TeamCardProps {
+  members: Member[]
+  renderActions?: (member: Member) => ReactNode
+}
+
+export function TeamCard({ members, renderActions }: TeamCardProps) {
   return (
     <Card>
       <CardContent>
@@ -12,7 +18,7 @@ export function TeamCard({ members }: { members: Member[] }) {
         </Typography>
         <List dense>
           {members.map((member) => (
-            <ListItem key={member.id} disableGutters>
+            <ListItem key={member.id} disableGutters secondaryAction={renderActions?.(member)}>
               <ListItemAvatar>
                 <UserAvatar user={member.user} />
               </ListItemAvatar>

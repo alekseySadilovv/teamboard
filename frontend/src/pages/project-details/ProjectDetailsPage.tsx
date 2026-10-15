@@ -7,6 +7,7 @@ import { ProjectStatusChip, useProject } from '../../entities/project'
 import { useSession } from '../../entities/session'
 import { ApplyDialog } from '../../features/apply-to-project'
 import { DeleteProjectButton } from '../../features/delete-project'
+import { MemberActions } from '../../features/manage-team'
 import { ApiError } from '../../shared/api'
 import { formatDate } from '../../shared/lib/format'
 import { EmptyState, ErrorState, TagChip } from '../../shared/ui'
@@ -67,6 +68,7 @@ export function ProjectDetailsPage() {
   }
 
   const isOwner = user?.id === project.owner.id
+  const canManage = isOwner || Boolean(user?.isAdmin)
   const isMember = !isOwner && project.members.some((member) => member.user.id === user?.id)
   const canApply = Boolean(user) && !isOwner && !isMember
 
@@ -100,7 +102,7 @@ export function ProjectDetailsPage() {
                   <TagChip key={tag} tag={tag} clickable onClick={() => navigate(`/?tag=${encodeURIComponent(tag)}`)} />
                 ))}
               </Stack>
-              {isOwner && (
+              {canManage && (
                 <Stack direction="row" spacing={1} sx={{ mt: 3 }}>
                   <Button component={RouterLink} to={`/projects/${project.id}/edit`} startIcon={<EditIcon />} variant="outlined">
                     Редактировать
@@ -125,7 +127,12 @@ export function ProjectDetailsPage() {
             isMember={isMember}
             onApply={() => openApply()}
           />
-          <TeamCard members={project.members} />
+          <TeamCard
+            members={project.members}
+            renderActions={(member) => (
+              <MemberActions project={project} member={member} currentUserId={user?.id} canManage={canManage} />
+            )}
+          />
         </Grid>
       </Grid>
 

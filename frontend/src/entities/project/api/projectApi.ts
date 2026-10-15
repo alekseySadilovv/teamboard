@@ -7,4 +7,5 @@ export const projectApi = {
   create: (input: ProjectInput) => api.post<Project>('/projects', input),
   update: (id: number, input: Partial<ProjectInput>) => api.patch<Project>(`/projects/${id}`, input),
   remove: (id: number) => api.delete(`/projects/${id}`),
+  removeMember: (projectId: number, memberId: number) => api.delete(`/projects/${projectId}/members/${memberId}`),
 }

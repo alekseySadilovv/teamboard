@@ -48,3 +48,14 @@ export function useDeleteProject() {
     },
   })
 }
+
+export function useRemoveMember(projectId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (memberId: number) => projectApi.removeMember(projectId, memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+    },
+  })
+}

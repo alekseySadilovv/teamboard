@@ -20,7 +20,7 @@ export function ProjectEditPage() {
     content = <LoadingState />
   } else if (isEdit && isError) {
     content = <ErrorState error={error} onRetry={() => refetch()} />
-  } else if (isEdit && project && project.owner.id !== user?.id) {
+  } else if (isEdit && project && project.owner.id !== user?.id && !user?.isAdmin) {
     content = (
       <EmptyState
         icon={<LockIcon fontSize="inherit" />}
