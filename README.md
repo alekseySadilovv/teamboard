@@ -43,6 +43,129 @@
 ## Стек
 
 - **Frontend:** React 19, TypeScript, Vite, React Router, MUI (Material UI) — библиотека UI-компонентов.
+- **Backend:** Python 3.11, FastAPI, SQLAlchemy 2, Alembic, Pydantic.
+- **База данных:** PostgreSQL 14+.
+
+## Структура репозитория
+
+```
+backend/               серверная часть (FastAPI)
+  app/
+    api/routes/        маршруты API
+    models/            модели SQLAlchemy
+    schemas/           схемы валидации запросов и ответов (Pydantic)
+    services/          операции с данными и бизнес-логика
+    db/                подключение к БД и сессии
+    core/              конфигурация приложения и обработка ошибок
+    seed.py            заполнение БД демонстрационными данными
+  alembic/             миграции БД
+frontend/              клиентская часть (React + TypeScript)
+docs/screenshots/      скриншоты экранов
+```
+
+## Модель данных
+
+```
+users ──< projects ──< project_roles ──< applications >── users
+  │          │  └──< project_members >──────────────────── users
+  │          └──< project_tags >── tags
+```
+
+| Таблица           | Назначение                       | Основные поля                                                                                  |
+|-------------------|----------------------------------|------------------------------------------------------------------------------------------------|
+| `users`           | Пользователи                     | `id` PK, `username` UQ, `email` UQ, `full_name`, `bio`, `skills[]`                              |
+| `projects`        | Проекты (идеи)                   | `id` PK, `title`, `summary`, `description`, `status`, `owner_id` FK → users                    |
+| `tags`            | Теги                             | `id` PK, `name` UQ                                                                             |
+| `project_tags`    | Связь «многие ко многим»         | `project_id` FK → projects, `tag_id` FK → tags (составной PK)                                  |
+| `project_roles`   | Роли, которые ищет команда       | `id` PK, `project_id` FK → projects, `title`, `description`, `is_open` («ищем» / «занята»)      |
+| `project_members` | Участники команды                | `id` PK, `project_id` FK, `user_id` FK, `role_id` FK → project_roles, `role_title`; UQ(project, user) |
+| `applications`    | Заявки в команду                 | `id` PK, `project_id` FK, `role_id` FK, `user_id` FK, `message`, `status` (pending / accepted / rejected) |
+
+Правила предметной области:
+
+- при создании проекта автор автоматически добавляется в команду;
+- заявку можно подать только на открытую роль, не в свой проект и не повторно, пока предыдущая на рассмотрении;
+- при принятии заявки пользователь добавляется в команду, роль закрывается, остальные заявки на эту роль отклоняются;
+- отозвать (удалить) можно только заявку на рассмотрении;
+- при удалении проекта каскадно удаляются его роли, участники, заявки и связи с тегами.
+
+## API
+
+Документация Swagger доступна после запуска backend: http://localhost:8000/docs.
+Все поля в JSON передаются в camelCase.
+
+| Метод и путь                                   | Описание                                                      |
+|------------------------------------------------|---------------------------------------------------------------|
+| `GET /api/users`, `POST /api/users`            | Список (`search`, `limit`, `offset`) и создание пользователя  |
+| `GET/PATCH/DELETE /api/users/{id}`             | Получение, изменение, удаление пользователя                   |
+| `GET /api/projects`                            | Каталог: `search`, `tags` (можно несколько), `status`, `hasOpenRoles`, `ownerId`, `memberId`, `limit`, `offset` |
+| `POST /api/projects`                           | Создание проекта вместе с тегами и ролями                     |
+| `GET/PATCH/DELETE /api/projects/{id}`          | Получение, изменение (включая синхронизацию ролей), удаление  |
+| `POST /api/projects/{id}/roles`                | Добавление роли                                               |
+| `PATCH/DELETE /api/roles/{id}`                 | Изменение и удаление роли                                     |
+| `DELETE /api/projects/{id}/members/{memberId}` | Исключение участника из команды                               |
+| `GET /api/tags`, `POST /api/tags`              | Теги с количеством проектов, создание тега                    |
+| `GET/PATCH/DELETE /api/tags/{id}`              | Получение, переименование, удаление тега                      |
+| `GET /api/applications`                        | Заявки: `userId`, `ownerId`, `projectId`, `status`            |
+| `POST /api/applications`                       | Подача заявки на роль                                         |
+| `GET/PATCH/DELETE /api/applications/{id}`      | Получение, решение (`accepted` / `rejected`), отзыв заявки    |
+
+Ошибки возвращаются в едином формате:
+
+```json
+{ "detail": "Ошибка валидации данных", "errors": [{ "field": "title", "message": "Слишком короткое значение (минимум 3 симв.)" }] }
+```
+
+| Код   | Когда                                                         |
+|-------|---------------------------------------------------------------|
+| `400` | Нарушение правил (заявка в свой проект, роль закрыта и т. п.) |
+| `404` | Запись не найдена                                             |
+| `409` | Конфликт уникальности (имя пользователя, email, тег, повторная заявка) |
+| `422` | Некорректные данные запроса                                   |
+
+## Запуск backend
+
+### 1. Подготовка базы данных
+
+Нужен запущенный PostgreSQL. Создайте пользователя и базу (пароль замените своим):
+
+```bash
+psql -d postgres -c "CREATE ROLE teamboard LOGIN PASSWORD 'change_me';"
+psql -d postgres -c "CREATE DATABASE teamboard OWNER teamboard;"
+```
+
+### 2. Окружение и зависимости
+
+```bash
+cd backend
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+В файле `.env` укажите параметры подключения к PostgreSQL (`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`,
+`POSTGRES_USER`, `POSTGRES_PASSWORD`). Файл `.env` не попадает в репозиторий.
+
+### 3. Создание таблиц
+
+Таблицы создаются миграциями Alembic:
+
+```bash
+alembic upgrade head
+```
+
+Заполнение демонстрационными данными (необязательно):
+
+```bash
+python -m app.seed
+```
+
+### 4. Запуск сервера
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
 
 ## Запуск frontend
 
