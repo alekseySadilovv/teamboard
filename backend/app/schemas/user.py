@@ -23,16 +23,17 @@ class UserBase(CamelModel):
         return list(dict.fromkeys(value))
 
 
-class UserCreate(UserBase):
-    pass
-
-
 class UserUpdate(CamelModel):
     username: Username | None = None
     email: EmailStr | None = None
     full_name: FullName | None = None
     bio: str | None = Field(default=None, max_length=2000)
     skills: list[Skill] | None = Field(default=None, max_length=20)
+
+    @field_validator("skills")
+    @classmethod
+    def unique_skills(cls, value: list[str] | None) -> list[str] | None:
+        return list(dict.fromkeys(value)) if value is not None else None
 
 
 class UserShort(CamelModel):
@@ -41,6 +42,16 @@ class UserShort(CamelModel):
     full_name: str
 
 
+class UserPublic(CamelModel):
+    id: int
+    username: str
+    full_name: str
+    bio: str
+    skills: list[str]
+    created_at: datetime
+
+
 class UserRead(UserBase):
     id: int
+    is_admin: bool
     created_at: datetime

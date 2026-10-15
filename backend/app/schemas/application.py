@@ -10,7 +10,6 @@ from app.schemas.user import UserShort
 class ApplicationCreate(CamelModel):
     role_id: int
     message: str = Field(default="", max_length=2000)
-    user_id: int
 
 
 class ApplicationDecision(CamelModel):

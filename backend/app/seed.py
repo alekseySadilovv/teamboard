@@ -1,10 +1,14 @@
+import os
+
 from sqlalchemy import select
 
+from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models import ApplicationStatus, ProjectStatus, User
 from app.schemas.project import ProjectCreate, RoleCreate
-from app.schemas.user import UserCreate
-from app.services import applications, projects, users
+from app.services import applications, projects
+
+SEED_PASSWORD = os.getenv("SEED_PASSWORD", "password1")
 
 USERS = [
     ("asadilov", "asadilov@example.com", "Алексей Садилов", "Студент МТУСИ, frontend-разработчик.", ["React", "TypeScript", "Python"]),
@@ -12,6 +16,7 @@ USERS = [
     ("ismirnov", "ismirnov@example.com", "Иван Смирнов", "Занимаюсь машинным обучением.", ["PyTorch", "OpenCV"]),
     ("okuznetsova", "okuznetsova@example.com", "Ольга Кузнецова", "Дизайнер интерфейсов и иллюстратор.", ["Figma", "Pixel art"]),
     ("dorlov", "dorlov@example.com", "Дмитрий Орлов", "Fullstack, делаю учебные платформы.", ["React", "Node.js", "SQL"]),
+    ("admin", "admin@example.com", "Администратор", "Модерация тегов и проектов.", []),
 ]
 
 PROJECTS = [
@@ -77,8 +82,16 @@ APPLICATIONS = [
 ]
 
 
-def make_user(username: str, email: str, full_name: str, bio: str, skills: list[str]) -> UserCreate:
-    return UserCreate(username=username, email=email, full_name=full_name, bio=bio, skills=skills)
+def make_user(username: str, email: str, full_name: str, bio: str, skills: list[str], password_hash: str) -> User:
+    return User(
+        username=username,
+        email=email,
+        full_name=full_name,
+        bio=bio,
+        skills=skills,
+        password_hash=password_hash,
+        is_admin=username == "admin",
+    )
 
 
 def run() -> None:
@@ -87,10 +100,13 @@ def run() -> None:
             print("База уже содержит данные, заполнение пропущено")
             return
 
+        password_hash = hash_password(SEED_PASSWORD)
         by_name = {}
         for item in USERS:
-            user = users.create_user(db, make_user(*item))
+            user = make_user(*item, password_hash=password_hash)
+            db.add(user)
             by_name[user.username] = user
+        db.commit()
 
         by_title = {}
         for item in PROJECTS:
@@ -103,17 +119,17 @@ def run() -> None:
                     status=item["status"],
                     tags=item["tags"],
                     roles=[RoleCreate(title=t, description=d, is_open=o) for t, d, o in item["roles"]],
-                    owner_id=by_name[item["owner"]].id,
                 ),
+                by_name[item["owner"]],
             )
             by_title[project.title] = project
 
         for username, title, role_title, message, decision in APPLICATIONS:
             project = by_title[title]
             role = next(role for role in project.roles if role.title == role_title)
-            application = applications.create_application(db, by_name[username].id, role.id, message)
+            application = applications.create_application(db, by_name[username], role.id, message)
             if decision is not None:
-                applications.decide_application(db, application.id, decision)
+                applications.decide_application(db, application.id, decision, project.owner)
 
         print(f"Добавлено: пользователей {len(USERS)}, проектов {len(PROJECTS)}, заявок {len(APPLICATIONS)}")
 

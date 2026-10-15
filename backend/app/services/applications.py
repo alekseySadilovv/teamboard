@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Application, ApplicationStatus, Project, ProjectMember, ProjectRole
-from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
-from app.services.users import get_user
+from app.models import Application, ApplicationStatus, Project, ProjectMember, ProjectRole, User
+from app.services.errors import BusinessRuleError, ConflictError, NotFoundError, PermissionDeniedError
+from app.services.projects import ensure_can_manage
 
 _application_options = (
     selectinload(Application.project),
@@ -18,6 +18,13 @@ def get_application(db: Session, application_id: int) -> Application:
     )
     if application is None:
         raise NotFoundError("Заявка не найдена")
+    return application
+
+
+def get_application_for(db: Session, application_id: int, user: User) -> Application:
+    application = get_application(db, application_id)
+    if application.user_id != user.id and application.project.owner_id != user.id and not user.is_admin:
+        raise PermissionDeniedError("Заявка доступна только её автору и автору проекта")
     return application
 
 
@@ -41,8 +48,7 @@ def list_applications(
     return list(db.scalars(query.order_by(Application.created_at.desc(), Application.id.desc())).all())
 
 
-def create_application(db: Session, user_id: int, role_id: int, message: str) -> Application:
-    user = get_user(db, user_id)
+def create_application(db: Session, user: User, role_id: int, message: str) -> Application:
     role = db.get(ProjectRole, role_id)
     if role is None:
         raise NotFoundError("Роль не найдена")
@@ -69,8 +75,9 @@ def create_application(db: Session, user_id: int, role_id: int, message: str) ->
     return get_application(db, application.id)
 
 
-def decide_application(db: Session, application_id: int, status: ApplicationStatus) -> Application:
+def decide_application(db: Session, application_id: int, status: ApplicationStatus, user: User) -> Application:
     application = get_application(db, application_id)
+    ensure_can_manage(application.project, user)
     if application.status != ApplicationStatus.pending:
         raise BusinessRuleError("Заявка уже рассмотрена")
     if status == ApplicationStatus.pending:
@@ -101,8 +108,10 @@ def decide_application(db: Session, application_id: int, status: ApplicationStat
     return get_application(db, application.id)
 
 
-def delete_application(db: Session, application_id: int) -> None:
+def delete_application(db: Session, application_id: int, user: User) -> None:
     application = get_application(db, application_id)
+    if application.user_id != user.id:
+        raise PermissionDeniedError("Отозвать заявку может только её автор")
     if application.status != ApplicationStatus.pending:
         raise BusinessRuleError("Отозвать можно только заявку на рассмотрении")
     db.delete(application)

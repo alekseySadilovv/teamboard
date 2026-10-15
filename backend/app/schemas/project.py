@@ -54,7 +54,6 @@ class ProjectCreate(CamelModel):
     status: ProjectStatus = ProjectStatus.recruiting
     tags: list[TagName] = Field(default_factory=list, max_length=10)
     roles: list[RoleCreate] = Field(default_factory=list, max_length=20)
-    owner_id: int
 
     _tags = field_validator("tags")(_unique_tags)
 

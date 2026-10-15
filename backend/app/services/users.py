@@ -2,7 +2,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import ProjectRole, User
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import UserUpdate
 from app.services.errors import ConflictError, NotFoundError
 
 
@@ -23,7 +23,7 @@ def list_users(db: Session, search: str | None, limit: int, offset: int) -> tupl
     return list(items), total
 
 
-def _ensure_unique(db: Session, username: str | None, email: str | None, exclude_id: int | None = None) -> None:
+def ensure_unique(db: Session, username: str | None, email: str | None, exclude_id: int | None = None) -> None:
     if username:
         existing = db.scalar(select(User).where(func.lower(User.username) == username.lower()))
         if existing and existing.id != exclude_id:
@@ -34,20 +34,10 @@ def _ensure_unique(db: Session, username: str | None, email: str | None, exclude
             raise ConflictError("Пользователь с таким email уже существует")
 
 
-def create_user(db: Session, data: UserCreate) -> User:
-    _ensure_unique(db, data.username, data.email)
-    user = User(**data.model_dump())
-    user.email = user.email.lower()
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def update_user(db: Session, user_id: int, data: UserUpdate) -> User:
     user = get_user(db, user_id)
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
-    _ensure_unique(db, changes.get("username"), changes.get("email"), exclude_id=user.id)
+    ensure_unique(db, changes.get("username"), changes.get("email"), exclude_id=user.id)
     if "email" in changes:
         changes["email"] = changes["email"].lower()
     for field, value in changes.items():
