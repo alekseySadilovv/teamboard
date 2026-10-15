@@ -88,7 +88,7 @@ export function ProjectFiltersPanel({ values, isActive, onChange, onReset }: Pro
       </Box>
 
       <Collapse in={isDesktop || expanded} timeout="auto">
-        <Grid container spacing={2} sx={{ alignItems: 'center', mt: 0.5 }}>
+        <Grid container spacing={2} sx={{ alignItems: 'center', mt: 2 }}>
           <Grid size={{ xs: 12, md: 5 }}>
             <Autocomplete
               multiple

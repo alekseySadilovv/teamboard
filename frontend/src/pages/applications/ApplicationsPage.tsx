@@ -53,7 +53,11 @@ export function ApplicationsPage() {
         <Tab
           value="incoming"
           label={
-            <Badge badgeContent={pendingIncoming} color="error" sx={{ '& .MuiBadge-badge': { right: -12 } }}>
+            <Badge
+              badgeContent={pendingIncoming}
+              color="error"
+              sx={{ alignItems: 'center', '& .MuiBadge-badge': { position: 'static', transform: 'none', ml: 1 } }}
+            >
               Входящие
             </Badge>
           }
