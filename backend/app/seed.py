@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -22,6 +23,7 @@ USERS = [
 PROJECTS = [
     {
         "owner": "asadilov",
+        "days_ago": 43,
         "title": "Расписание МТУСИ",
         "summary": "Мобильное приложение с расписанием занятий и уведомлениями о переносах.",
         "description": "Поиск по группе и преподавателю, push-уведомления об изменениях, офлайн-режим.",
@@ -34,6 +36,7 @@ PROJECTS = [
     },
     {
         "owner": "ismirnov",
+        "days_ago": 35,
         "title": "Распознавание рукописных конспектов",
         "summary": "ML-сервис, который превращает фото конспекта в структурированный текст.",
         "description": "Обучаем модель распознавания рукописного текста на русском языке и делаем веб-интерфейс.",
@@ -46,6 +49,7 @@ PROJECTS = [
     },
     {
         "owner": "okuznetsova",
+        "days_ago": 55,
         "title": "Пиксельный платформер",
         "summary": "Небольшая 2D-игра для участия в студенческом геймджеме.",
         "description": "Делаем платформер на Godot с ручной пиксельной графикой.",
@@ -55,6 +59,7 @@ PROJECTS = [
     },
     {
         "owner": "mpetrova",
+        "days_ago": 14,
         "title": "Умная теплица",
         "summary": "IoT-система мониторинга влажности и температуры с веб-панелью.",
         "description": "Датчики на ESP32 отправляют данные на сервер, веб-панель показывает графики.",
@@ -64,6 +69,7 @@ PROJECTS = [
     },
     {
         "owner": "dorlov",
+        "days_ago": 154,
         "title": "Тренажёр по SQL",
         "summary": "Веб-платформа с интерактивными задачами по SQL для первокурсников.",
         "description": "Задачи с автоматической проверкой запросов и рейтингом участников.",
@@ -122,6 +128,8 @@ def run() -> None:
                 ),
                 by_name[item["owner"]],
             )
+            project.created_at = project.updated_at = datetime.now(UTC) - timedelta(days=item["days_ago"])
+            db.commit()
             by_title[project.title] = project
 
         for username, title, role_title, message, decision in APPLICATIONS:

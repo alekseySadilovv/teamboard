@@ -156,10 +156,11 @@ def delete_role(db: Session, role_id: int, user: User) -> None:
 
 def remove_member(db: Session, project_id: int, member_id: int, user: User) -> None:
     project = get_project(db, project_id)
-    ensure_can_manage(project, user)
     member = next((item for item in project.members if item.id == member_id), None)
     if member is None:
         raise NotFoundError("Участник не найден")
+    if member.user_id != user.id:
+        ensure_can_manage(project, user)
     if member.user_id == project.owner_id:
         raise BusinessRuleError("Автора проекта нельзя исключить из команды")
     if member.role_id is not None:
