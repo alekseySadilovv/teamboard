@@ -17,7 +17,6 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
-    mode: 'onTouched',
   })
 
   return (

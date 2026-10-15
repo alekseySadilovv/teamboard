@@ -25,7 +25,6 @@ export function ProjectForm({ project, onSaved, onCancel }: ProjectFormProps) {
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: toFormValues(project),
-    mode: 'onTouched',
   })
 
   const summaryLength = useWatch({ control, name: 'summary' }).length

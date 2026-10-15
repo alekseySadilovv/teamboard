@@ -48,7 +48,6 @@ export function ApplyDialog({ project, open, initialRoleId, onClose }: ApplyDial
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     values: { roleId: initialRoleId ?? openRoles[0]?.id ?? 0, message: '' },
-    mode: 'onTouched',
   })
 
   const messageLength = useWatch({ control, name: 'message' }).length

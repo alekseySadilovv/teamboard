@@ -18,7 +18,6 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { fullName: '', username: '', email: '', password: '', confirmPassword: '' },
-    mode: 'onTouched',
   })
   const mutation = useMutation({
     mutationFn: ({ confirmPassword: _confirm, ...values }: RegisterValues) => register(values),
