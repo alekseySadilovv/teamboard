@@ -112,17 +112,19 @@ frontend/src/
 users ──< projects ──< project_roles ──< applications >── users
   │          │  └──< project_members >──────────────────── users
   │          └──< project_tags >── tags
+  └──< refresh_tokens
 ```
 
 | Таблица           | Назначение                       | Основные поля                                                                                  |
 |-------------------|----------------------------------|------------------------------------------------------------------------------------------------|
-| `users`           | Пользователи                     | `id` PK, `username` UQ, `email` UQ, `full_name`, `bio`, `skills[]`                              |
+| `users`           | Пользователи                     | `id` PK, `username` UQ, `email` UQ, `full_name`, `bio`, `skills[]`, `password_hash`, `is_admin` |
 | `projects`        | Проекты (идеи)                   | `id` PK, `title`, `summary`, `description`, `status`, `owner_id` FK → users                    |
 | `tags`            | Теги                             | `id` PK, `name` UQ                                                                             |
 | `project_tags`    | Связь «многие ко многим»         | `project_id` FK → projects, `tag_id` FK → tags (составной PK)                                  |
 | `project_roles`   | Роли, которые ищет команда       | `id` PK, `project_id` FK → projects, `title`, `description`, `is_open` («ищем» / «занята»)      |
 | `project_members` | Участники команды                | `id` PK, `project_id` FK, `user_id` FK, `role_id` FK → project_roles, `role_title`; UQ(project, user) |
 | `applications`    | Заявки в команду                 | `id` PK, `project_id` FK, `role_id` FK, `user_id` FK, `message`, `status` (pending / accepted / rejected) |
+| `refresh_tokens`  | Сессии (refresh-токены)          | `id` PK, `user_id` FK → users, `token_hash` UQ (SHA-256), `expires_at`, `revoked_at`, `user_agent` |
 
 Правила предметной области:
 
@@ -132,26 +134,59 @@ users ──< projects ──< project_roles ──< applications >── users
 - отозвать (удалить) можно только заявку на рассмотрении;
 - при удалении проекта каскадно удаляются его роли, участники, заявки и связи с тегами.
 
+## Аутентификация и авторизация
+
+- **Пароли** хранятся в виде хешей Argon2id (`argon2-cffi`); при входе хеш при необходимости пересчитывается
+  с актуальными параметрами. Требования к паролю: 8–128 символов, хотя бы одна буква и одна цифра.
+- **Access token** — JWT (HS256), срок действия 15 минут (`ACCESS_TOKEN_EXPIRE_MINUTES`). Содержит `sub`
+  (id пользователя), `type=access`, `iat`, `exp`, `jti`. Передаётся в заголовке `Authorization: Bearer <token>`.
+  На клиенте хранится только в памяти.
+- **Refresh token** — случайная строка (`secrets.token_urlsafe`), срок действия 14 дней
+  (`REFRESH_TOKEN_EXPIRE_DAYS`). Передаётся в cookie `refresh_token` с флагами `HttpOnly`, `SameSite=Lax`,
+  `Path=/api/auth` (и `Secure` при `REFRESH_COOKIE_SECURE=true`). В БД хранится только SHA-256 хеш токена.
+- **Обновление** (`POST /api/auth/refresh`): старый refresh token отзывается, выдаётся новая пара (ротация).
+  Отказ с кодом 401 — если токена нет, он не найден, истёк или отозван. Повторное использование уже отозванного
+  токена считается признаком кражи: отзываются все сессии пользователя.
+- **Выход** (`POST /api/auth/logout`): refresh token текущей сессии помечается отозванным, cookie удаляется,
+  на клиенте очищаются access token, данные пользователя и кэш запросов.
+- **Клиент:** при ответе 401 HTTP-клиент один раз вызывает `/auth/refresh` (параллельные запросы ждут один общий
+  refresh) и повторяет исходный запрос; если обновить токен не удалось, сессия завершается.
+  При загрузке страницы сессия восстанавливается по refresh-cookie.
+- **Права доступа:** чтение каталога, проектов и тегов — публичное. Создание проекта, заявки, работа с профилем —
+  только для вошедших пользователей. Изменять и удалять проект, его роли и участников, принимать и отклонять
+  заявки может только автор проекта; отозвать заявку — только её автор; просмотреть заявку — её автор или
+  автор проекта. Переименование и удаление тегов — только администратор (`is_admin`).
+  Нет токена или он недействителен — `401`, нет прав — `403`.
+
 ## API
 
 Документация Swagger доступна после запуска backend: http://localhost:8000/docs.
-Все поля в JSON передаются в camelCase.
+Все поля в JSON передаются в camelCase. Пометка «(авт.)» — нужен access token, «(админ)» — только администратор.
 
 | Метод и путь                                   | Описание                                                      |
 |------------------------------------------------|---------------------------------------------------------------|
-| `GET /api/users`, `POST /api/users`            | Список (`search`, `limit`, `offset`) и создание пользователя  |
-| `GET/PATCH/DELETE /api/users/{id}`             | Получение, изменение, удаление пользователя                   |
+| `POST /api/auth/register`                      | Регистрация, возвращает access token и пользователя, ставит refresh-cookie |
+| `POST /api/auth/login`                         | Вход по email и паролю                                        |
+| `POST /api/auth/refresh`                       | Новая пара токенов по refresh-cookie                          |
+| `POST /api/auth/logout`                        | Выход: отзыв refresh token текущей сессии                     |
+| `GET/PATCH/DELETE /api/users/me` (авт.)            | Текущий пользователь: получение, изменение профиля, удаление аккаунта |
+| `GET /api/users`, `GET /api/users/{id}`        | Публичные профили (без email)                                 |
 | `GET /api/projects`                            | Каталог: `search`, `tags` (можно несколько), `status`, `hasOpenRoles`, `ownerId`, `memberId`, `limit`, `offset` |
-| `POST /api/projects`                           | Создание проекта вместе с тегами и ролями                     |
-| `GET/PATCH/DELETE /api/projects/{id}`          | Получение, изменение (включая синхронизацию ролей), удаление  |
-| `POST /api/projects/{id}/roles`                | Добавление роли                                               |
-| `PATCH/DELETE /api/roles/{id}`                 | Изменение и удаление роли                                     |
-| `DELETE /api/projects/{id}/members/{memberId}` | Исключение участника из команды                               |
-| `GET /api/tags`, `POST /api/tags`              | Теги с количеством проектов, создание тега                    |
-| `GET/PATCH/DELETE /api/tags/{id}`              | Получение, переименование, удаление тега                      |
-| `GET /api/applications`                        | Заявки: `userId`, `ownerId`, `projectId`, `status`            |
-| `POST /api/applications`                       | Подача заявки на роль                                         |
-| `GET/PATCH/DELETE /api/applications/{id}`      | Получение, решение (`accepted` / `rejected`), отзыв заявки    |
+| `POST /api/projects` (авт.)                        | Создание проекта вместе с тегами и ролями (автор — текущий пользователь) |
+| `GET /api/projects/{id}`                       | Получение проекта                                             |
+| `PATCH/DELETE /api/projects/{id}` (авт.)           | Изменение (включая синхронизацию ролей) и удаление — автор    |
+| `POST /api/projects/{id}/roles` (авт.)             | Добавление роли — автор                                       |
+| `PATCH/DELETE /api/roles/{id}` (авт.)              | Изменение и удаление роли — автор                             |
+| `DELETE /api/projects/{id}/members/{memberId}` (авт.) | Исключение участника из команды — автор                    |
+| `GET /api/tags`, `GET /api/tags/{id}`          | Теги с количеством проектов                                   |
+| `POST /api/tags` (авт.)                            | Создание тега                                                 |
+| `PATCH/DELETE /api/tags/{id}` (админ)               | Переименование и удаление тега                                |
+| `GET /api/applications/my` (авт.)                  | Мои заявки (`status` — фильтр)                                |
+| `GET /api/applications/incoming` (авт.)            | Заявки в мои проекты                                          |
+| `POST /api/applications` (авт.)                    | Подача заявки на роль                                         |
+| `GET /api/applications/{id}` (авт.)                | Заявка — её автор или автор проекта                           |
+| `PATCH /api/applications/{id}` (авт.)              | Решение `accepted` / `rejected` — автор проекта               |
+| `DELETE /api/applications/{id}` (авт.)             | Отзыв заявки на рассмотрении — автор заявки                   |
 
 Ошибки возвращаются в едином формате:
 
@@ -162,6 +197,8 @@ users ──< projects ──< project_roles ──< applications >── users
 | Код   | Когда                                                         |
 |-------|---------------------------------------------------------------|
 | `400` | Нарушение правил (заявка в свой проект, роль закрыта и т. п.) |
+| `401` | Нет access token, он недействителен или истёк; ошибка входа или обновления токена |
+| `403` | Недостаточно прав для операции                                |
 | `404` | Запись не найдена                                             |
 | `409` | Конфликт уникальности (имя пользователя, email, тег, повторная заявка) |
 | `422` | Некорректные данные запроса                                   |
@@ -188,7 +225,13 @@ cp .env.example .env
 ```
 
 В файле `.env` укажите параметры подключения к PostgreSQL (`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`,
-`POSTGRES_USER`, `POSTGRES_PASSWORD`). Файл `.env` не попадает в репозиторий.
+`POSTGRES_USER`, `POSTGRES_PASSWORD`) и секретный ключ для подписи JWT `JWT_SECRET_KEY` (не короче 32 символов):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+Файл `.env` не попадает в репозиторий.
 
 ### 3. Создание таблиц
 
@@ -203,6 +246,10 @@ alembic upgrade head
 ```bash
 python -m app.seed
 ```
+
+Создаются пользователи `asadilov`, `mpetrova`, `ismirnov`, `okuznetsova`, `dorlov` (email вида
+`<имя>@example.com`) и администратор `admin@example.com`. Пароль всех демо-пользователей — `password1`
+(можно задать переменной окружения `SEED_PASSWORD`).
 
 ### 4. Запуск сервера
 
@@ -220,7 +267,9 @@ npm install
 npm run dev
 ```
 
-Приложение откроется по адресу http://localhost:5173.
+Приложение откроется по адресу http://localhost:5173. Dev-сервер Vite проксирует запросы `/api`
+на backend (`http://localhost:8000`), поэтому refresh-cookie работает без настройки CORS.
+Backend должен быть запущен.
 
 Сборка production-версии:
 
@@ -228,9 +277,9 @@ npm run dev
 npm run build
 ```
 
-На этом этапе экраны работают на демонстрационных данных: запросы обрабатывает имитация API
-в `frontend/src/shared/api/mock` (с задержкой ответа, чтобы были видны состояния загрузки).
-Демо-пользователь: `asadilov@example.com` / `password1`.
+Регистрация, вход, восстановление сессии, обновление токенов, выход и профиль пользователя работают через API
+backend. Данные проектов и заявок на этом этапе ещё обрабатывает имитация API в `frontend/src/shared/api/mock`
+(с задержкой ответа, чтобы были видны состояния загрузки). Демо-пользователь: `asadilov@example.com` / `password1`.
 
 ## История изменений интерфейса
 
@@ -239,3 +288,6 @@ npm run build
   добавлены фильтр по статусу и постраничный вывод. В форме проекта роли добавляются и удаляются динамически,
   на странице проекта появились кнопки «Откликнуться» у каждой открытой роли и удаление проекта.
   В шапке вместо кнопки «Войти» после входа отображается меню пользователя. Скриншоты обновлены.
+- **ЛР 4.** Вход и регистрация работают через backend: ошибки сервера (неверный пароль, занятый email или имя)
+  показываются в форме. Страницы создания проекта, заявок и профиля без входа перенаправляют на страницу входа
+  с возвратом обратно после авторизации. Добавлены скриншоты 22–23.
